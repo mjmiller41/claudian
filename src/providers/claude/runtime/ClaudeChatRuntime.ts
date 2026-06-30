@@ -140,6 +140,7 @@ export class ClaudianService implements ChatRuntime {
   private askUserQuestionCallback: AskUserQuestionCallback | null = null;
   private exitPlanModeCallback: ExitPlanModeCallback | null = null;
   private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
+  private permissionModeOverride: PermissionMode | null = null;
   private vaultPath: string | null = null;
   private currentExternalContextPaths: string[] = [];
   private readyStateListeners = new Set<(ready: boolean) => void>();
@@ -1449,7 +1450,7 @@ export class ClaudianService implements ChatRuntime {
         getVaultPath: () => this.vaultPath,
         getCliPath: () => this.plugin.getResolvedProviderCliPath('claude'),
         getScopedSettings: () => this.getScopedSettings(),
-        getPermissionMode: () => this.plugin.settings.permissionMode,
+        getPermissionMode: () => this.getEffectivePermissionMode(),
         resolveSDKPermissionMode: (mode) => this.resolveSDKPermissionMode(mode),
         mcpManager: this.mcpManager,
         buildPersistentQueryConfig: (vaultPath, cliPath, externalContextPaths) =>
@@ -1779,6 +1780,19 @@ export class ClaudianService implements ChatRuntime {
     this.permissionModeSyncCallback = callback;
   }
 
+  /**
+   * Pin this runtime instance to a permission mode independent of the global
+   * setting. Used by headless callers (the board) to force a gated mode so
+   * `canUseTool` fires; pass `null` to fall back to the global setting.
+   */
+  setPermissionModeOverride(mode: PermissionMode | null): void {
+    this.permissionModeOverride = mode;
+  }
+
+  private getEffectivePermissionMode(): PermissionMode {
+    return this.permissionModeOverride ?? this.plugin.settings.permissionMode;
+  }
+
   setSubagentHookProvider(getState: () => SubagentHookState): void {
     this._subagentStateProvider = getState;
   }
@@ -1793,7 +1807,7 @@ export class ClaudianService implements ChatRuntime {
       getApprovalCallback: () => this.approvalCallback,
       getAskUserQuestionCallback: () => this.askUserQuestionCallback,
       getExitPlanModeCallback: () => this.exitPlanModeCallback,
-      getPermissionMode: () => this.plugin.settings.permissionMode,
+      getPermissionMode: () => this.getEffectivePermissionMode(),
       resolveSDKPermissionMode: (mode) => this.resolveSDKPermissionMode(mode),
       syncPermissionMode: (mode, sdkMode) => {
         if (this.currentConfig) {
