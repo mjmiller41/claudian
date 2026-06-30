@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## Project Overview
 
 Claudian is an Obsidian plugin that embeds provider-backed chat runtimes in a sidebar and inline-edit flow. Claude is the default provider. Codex is optional and joins the same conversation model through `Conversation.providerId` plus provider-owned `providerState`.
@@ -26,6 +28,8 @@ npm run test:watch
 npm run test:coverage
 ```
 
+Requires Node `>=24 <25` (see `.node-version`). Jest must run through the wrapper (`npm run test`, never bare `jest`) — `scripts/run-jest.js` boots Node with `--localstorage-file` so `localStorage` is available in tests. `npm run dev` and `npm run build` compile CSS first via `scripts/build-css.mjs`.
+
 ## Architecture
 
 | Layer | Purpose | Details |
@@ -48,9 +52,13 @@ npm run test:coverage
 npm run test -- --selectProjects unit
 npm run test -- --selectProjects integration
 npm run test:coverage -- --selectProjects unit
+
+# Single file or focused test (args pass through to jest)
+npm run test -- tests/unit/path/to/file.test.ts
+npm run test -- -t "description substring"
 ```
 
-Tests mirror the `src/` layout under `tests/unit/` and `tests/integration/`.
+Tests mirror the `src/` layout under `tests/unit/` and `tests/integration/`. Jest is configured as two projects (`unit`, `integration`); path aliases `@/` → `src/`, `@test/` → `tests/`. The Claude SDK and `obsidian` are mocked under `tests/__mocks__/`.
 
 ## Storage
 
