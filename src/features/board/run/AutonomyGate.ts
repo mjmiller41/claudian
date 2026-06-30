@@ -32,8 +32,40 @@ const SAFE_READ_TOOLS: ReadonlySet<string> = new Set([
 
 const IN_VAULT_WRITE_TOOLS: ReadonlySet<string> = new Set(['Write', 'Edit', 'MultiEdit']);
 
+/** Binaries that only read; safe to auto-run under auto_safe when invoked plainly. */
+const READONLY_BINARIES: ReadonlySet<string> = new Set([
+  'ls', 'cat', 'head', 'tail', 'pwd', 'echo', 'wc', 'stat', 'tree', 'date', 'which', 'whoami',
+  'hostname', 'uname', 'basename', 'dirname', 'realpath', 'file', 'grep', 'rg', 'fd', 'find',
+  'sort', 'uniq', 'cut', 'nl', 'df', 'du', 'env',
+]);
+
+// Shell control characters that could chain, redirect, or subshell into something mutating.
+const SHELL_METACHARS = /[;&|<>`$(){}\n\\]/;
+// Mutating/outward binaries that must never auto-run, even if they appear as an argument.
+const DANGEROUS_TOKENS =
+  /\b(rm|rmdir|mv|cp|dd|chmod|chown|kill|curl|wget|ssh|scp|nc|ncat|sudo|tee|xargs|eval|exec|source|python3?|node|sh|bash|zsh|npm|npx|pip3?|git|mkfifo|truncate|ln|touch|mkdir|sed|awk)\b/;
+// Read-tool flags that actually write (e.g. find -delete / -exec, grep -o to a redirect).
+const WRITE_FLAGS = /(^|\s)-{1,2}(delete|exec|execdir|fprint\w*|output|out-file)\b/;
+
 export function isAlwaysAsk(toolName: string): boolean {
   return ALWAYS_ASK_FLOOR.some(({ service, action }) => service.test(toolName) && action.test(toolName));
+}
+
+/**
+ * True only for a single, plain invocation of a read-only binary with no shell
+ * metacharacters, mutating tokens, or write flags. Fails closed: anything it
+ * can't prove safe returns false (→ ask).
+ */
+export function isReadOnlyBash(command: unknown): boolean {
+  if (typeof command !== 'string') return false;
+  const trimmed = command.trim();
+  if (!trimmed) return false;
+  if (SHELL_METACHARS.test(trimmed)) return false;
+  if (DANGEROUS_TOKENS.test(trimmed)) return false;
+  if (WRITE_FLAGS.test(trimmed)) return false;
+  const first = trimmed.split(/\s+/)[0];
+  const binary = first.split('/').pop() ?? first;
+  return READONLY_BINARIES.has(binary);
 }
 
 function isVaultMcpTool(toolName: string): boolean {
@@ -73,6 +105,11 @@ export function decide(
 
   if (isVaultMcpTool(toolName)) {
     return isDeleteTool(toolName) ? 'ask' : 'allow';
+  }
+
+  if (toolName === 'Bash') {
+    const command = (input as { command?: unknown } | null)?.command;
+    return isReadOnlyBash(command) ? 'allow' : 'ask';
   }
 
   if (IN_VAULT_WRITE_TOOLS.has(toolName)) {

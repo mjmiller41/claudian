@@ -342,8 +342,8 @@ describe('QueryOptionsBuilder', () => {
       const options = QueryOptionsBuilder.buildPersistentQueryOptions(ctx);
 
       expect(options.permissionMode).toBe('acceptEdits');
-      // Always true to enable dynamic switching to bypassPermissions without restart
-      expect(options.allowDangerouslySkipPermissions).toBe(true);
+      // Non-yolo modes route tools through canUseTool instead of skipping permissions.
+      expect(options.allowDangerouslySkipPermissions).toBe(false);
       expect(options.canUseTool).toBe(canUseTool);
     });
 
@@ -358,7 +358,7 @@ describe('QueryOptionsBuilder', () => {
       const options = QueryOptionsBuilder.buildPersistentQueryOptions(ctx);
 
       expect(options.permissionMode).toBe('default');
-      expect(options.allowDangerouslySkipPermissions).toBe(true);
+      expect(options.allowDangerouslySkipPermissions).toBe(false);
     });
 
     it('resolves claudeSafeMode "auto" when permissionMode is normal', () => {
@@ -372,7 +372,7 @@ describe('QueryOptionsBuilder', () => {
       const options = QueryOptionsBuilder.buildPersistentQueryOptions(ctx);
 
       expect(options.permissionMode).toBe('auto');
-      expect(options.allowDangerouslySkipPermissions).toBe(true);
+      expect(options.allowDangerouslySkipPermissions).toBe(false);
       expect(options.extraArgs).toEqual({ 'enable-auto-mode': null });
     });
 
@@ -416,7 +416,7 @@ describe('QueryOptionsBuilder', () => {
       const options = QueryOptionsBuilder.buildPersistentQueryOptions(ctx);
 
       expect(options.permissionMode).toBe('plan');
-      expect(options.allowDangerouslySkipPermissions).toBe(true);
+      expect(options.allowDangerouslySkipPermissions).toBe(false);
       expect(options.canUseTool).toBe(canUseTool);
     });
 

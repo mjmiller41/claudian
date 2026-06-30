@@ -634,10 +634,17 @@ export class ClaudianService implements ChatRuntime {
    * Builds the base query options context from current state.
    */
   private getScopedSettings(): ClaudianSettings {
-    return ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+    const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
       this.plugin.settings,
       this.providerId,
     );
+    // A per-runtime override (set by headless callers such as the board) wins
+    // over the global mode so the whole options build — not just the approval
+    // closure — runs in the forced mode and canUseTool actually fires.
+    if (this.permissionModeOverride) {
+      return { ...snapshot, permissionMode: this.permissionModeOverride };
+    }
+    return snapshot;
   }
 
   private buildQueryOptionsContext(vaultPath: string, cliPath: string): QueryOptionsContext {

@@ -236,7 +236,10 @@ export class QueryOptionsBuilder {
     claudeSafeMode: ClaudeSafeMode,
     canUseTool?: CanUseTool
   ): void {
-    options.allowDangerouslySkipPermissions = true;
+    // Only yolo skips the permission system outright. In every other mode the
+    // tool calls must route through canUseTool — otherwise built-in tools
+    // (Bash/Write) bypass the gate, which a forced non-yolo board run relies on.
+    options.allowDangerouslySkipPermissions = permissionMode === 'yolo';
 
     if (canUseTool) {
       options.canUseTool = canUseTool;
