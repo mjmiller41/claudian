@@ -9,15 +9,19 @@ import type { CardState } from '../cards/CardState';
 import type { CardStore, RunResult } from '../cards/CardStore';
 import { decide } from './AutonomyGate';
 
-/** The concrete-runtime hook added to ClaudeChatRuntime; absent on providers without it. */
-interface PermissionModeOverridable {
+type ToolGateFn = (toolName: string, input: unknown) => 'allow' | 'ask' | 'deny';
+
+/** The concrete-runtime gate hooks added to ClaudeChatRuntime; absent on providers without them. */
+interface BoardGatedRuntime {
   setPermissionModeOverride(mode: PermissionMode | null): void;
+  setToolGate(gate: ToolGateFn | null): void;
 }
 
-function asOverridable(runtime: ChatRuntime): PermissionModeOverridable | null {
-  const candidate = runtime as unknown as Partial<PermissionModeOverridable>;
+function asGated(runtime: ChatRuntime): BoardGatedRuntime | null {
+  const candidate = runtime as unknown as Partial<BoardGatedRuntime>;
   return typeof candidate.setPermissionModeOverride === 'function'
-    ? (candidate as PermissionModeOverridable)
+    && typeof candidate.setToolGate === 'function'
+    ? (candidate as BoardGatedRuntime)
     : null;
 }
 
@@ -69,15 +73,15 @@ export class CardRunner {
         providerId: card.provider as ProviderId,
       });
 
-      const overridable = asOverridable(runtime);
-      if (!overridable) {
+      const gated = asGated(runtime);
+      if (!gated) {
         await this.deps.store.applyRunResult(
           path,
           this.failure(card, 'Permission gate unavailable for this provider; refusing to run ungated.'),
         );
         return;
       }
-      overridable.setPermissionModeOverride('normal');
+      gated.setPermissionModeOverride('normal');
 
       const conversation = this.buildConversation(card);
       runtime.syncConversationState({
@@ -86,11 +90,13 @@ export class CardRunner {
       });
 
       const vaultPath = getVaultPath(this.deps.plugin.app) ?? '';
+      const gateContext = { isPathWithinVault: (p: string) => !!vaultPath && isPathWithinVault(p, vaultPath) };
+
+      // PreToolUse gate covers built-in tools (Bash/Write); the approval callback
+      // renders the modal when the gate routes a call to `ask`.
+      gated.setToolGate((toolName, input) => decide(toolName, input, card.autonomy, gateContext));
       runtime.setApprovalCallback(async (toolName, input, description) => {
-        const gate = decide(toolName, input, card.autonomy, {
-          isPathWithinVault: (p) => !!vaultPath && isPathWithinVault(p, vaultPath),
-        });
-        if (gate === 'allow') return 'allow';
+        if (decide(toolName, input, card.autonomy, gateContext) === 'allow') return 'allow';
         return this.deps.requestApproval(card, toolName, input, description);
       });
       runtime.setAskUserQuestionCallback((input) => this.deps.askQuestion(input));

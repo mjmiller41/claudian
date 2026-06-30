@@ -69,6 +69,7 @@ import {
 import { CLAUDE_PROVIDER_CAPABILITIES } from '../capabilities';
 import { loadSubagentFinalResult, loadSubagentToolCalls } from '../history/ClaudeHistoryStore';
 import { createStopSubagentHook, type SubagentHookState } from '../hooks/SubagentHooks';
+import { createToolGateHook, type ToolGate } from '../hooks/ToolGateHook';
 import { toClaudeRuntimeModelId } from '../modelSelection';
 import { encodeClaudeTurn } from '../prompt/ClaudeTurnEncoder';
 import { isContextWindowEvent, isSessionInitEvent, isStreamChunk } from '../sdk/typeGuards';
@@ -141,6 +142,7 @@ export class ClaudianService implements ChatRuntime {
   private exitPlanModeCallback: ExitPlanModeCallback | null = null;
   private permissionModeSyncCallback: ((sdkMode: string) => void) | null = null;
   private permissionModeOverride: PermissionMode | null = null;
+  private toolGate: ToolGate | null = null;
   private vaultPath: string | null = null;
   private currentExternalContextPaths: string[] = [];
   private readyStateListeners = new Set<(ready: boolean) => void>();
@@ -713,6 +715,10 @@ export class ClaudianService implements ChatRuntime {
     hooks.Stop = [createStopSubagentHook(
       () => this._subagentStateProvider?.() ?? { hasRunning: false }
     )];
+
+    // PreToolUse gate for headless callers (the board): gates built-in tools that
+    // bypass canUseTool. Only active when a gate is set, so chat is unaffected.
+    hooks.PreToolUse = [createToolGateHook(() => this.toolGate)];
 
     return hooks;
   }
@@ -1794,6 +1800,14 @@ export class ClaudianService implements ChatRuntime {
    */
   setPermissionModeOverride(mode: PermissionMode | null): void {
     this.permissionModeOverride = mode;
+  }
+
+  /**
+   * Install a PreToolUse gate (used by the board) that decides every tool call —
+   * including built-in Bash/Write, which bypass canUseTool. Pass null to clear.
+   */
+  setToolGate(gate: ToolGate | null): void {
+    this.toolGate = gate;
   }
 
   private getEffectivePermissionMode(): PermissionMode {
