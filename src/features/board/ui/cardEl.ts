@@ -1,12 +1,16 @@
 import { setIcon } from 'obsidian';
 
-import type { CardState } from '../cards/CardState';
+import type { CardState, CardStatus } from '../cards/CardState';
 
 export interface CardElCallbacks {
   onOpen: (card: CardState) => void;
   onRun: (card: CardState) => void;
+  onReply: (card: CardState, text: string) => void;
   isRunning: (card: CardState) => boolean;
 }
+
+/** States where continuing the conversation makes sense. */
+const REPLIABLE: ReadonlySet<CardStatus> = new Set<CardStatus>(['review', 'done', 'failed']);
 
 export function renderCard(container: HTMLElement, card: CardState, cb: CardElCallbacks): void {
   const el = container.createDiv({ cls: 'claudian-board-card' });
@@ -48,6 +52,11 @@ export function renderCard(container: HTMLElement, card: CardState, cb: CardElCa
 
   if (card.kind === 'claude') {
     const running = cb.isRunning(card);
+
+    if (REPLIABLE.has(card.status) && !running) {
+      renderReply(el, actions, card, cb);
+    }
+
     const runBtn = actions.createEl('button', {
       cls: 'claudian-board-card-btn claudian-board-card-run',
       attr: { 'aria-label': running ? 'Running' : 'Run card' },
@@ -57,4 +66,43 @@ export function renderCard(container: HTMLElement, card: CardState, cb: CardElCa
     if (running) runBtn.addClass('is-running');
     runBtn.addEventListener('click', () => cb.onRun(card));
   }
+}
+
+function renderReply(
+  card: HTMLElement,
+  actions: HTMLElement,
+  state: CardState,
+  cb: CardElCallbacks,
+): void {
+  const replyArea = card.createDiv({ cls: 'claudian-board-card-reply is-collapsed' });
+  const input = replyArea.createEl('textarea', {
+    cls: 'claudian-board-reply-input',
+    attr: { placeholder: 'Reply to continue…', rows: '2' },
+  });
+  const send = replyArea.createEl('button', { cls: 'claudian-board-reply-send', text: 'Send' });
+
+  const submit = (): void => {
+    const text = input.value.trim();
+    if (!text) return;
+    cb.onReply(state, text);
+  };
+  send.addEventListener('click', submit);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      submit();
+    }
+  });
+
+  let open = false;
+  const toggleBtn = actions.createEl('button', {
+    cls: 'claudian-board-card-btn',
+    attr: { 'aria-label': 'Reply' },
+  });
+  setIcon(toggleBtn, 'reply');
+  toggleBtn.addEventListener('click', () => {
+    open = !open;
+    replyArea.toggleClass('is-collapsed', !open);
+    if (open) input.focus();
+  });
 }

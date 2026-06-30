@@ -170,6 +170,31 @@
   cursor: default;
 }
 
+.claudian-board-card-reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+  margin-top: var(--size-4-1);
+}
+
+.claudian-board-card-reply.is-collapsed {
+  display: none;
+}
+
+.claudian-board-reply-input {
+  width: 100%;
+  resize: vertical;
+  min-height: var(--size-4-12);
+  font-size: var(--font-ui-smaller);
+  border-radius: var(--radius-s);
+}
+
+.claudian-board-reply-send {
+  align-self: flex-end;
+  border-radius: 5px;
+  box-shadow: var(--input-shadow);
+}
+
 /* Approval + question modals */
 .claudian-board-approval-card,
 .claudian-board-question-header {

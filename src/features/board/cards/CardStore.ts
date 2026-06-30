@@ -25,6 +25,8 @@ export interface RunResult {
   session: string | null;
   providerState: Record<string, unknown> | null;
   error?: string;
+  /** The follow-up message that drove this turn, recorded for continue turns. */
+  prompt?: string;
 }
 
 /** Extract the task/prompt body: text between the frontmatter and `## Log`, minus the H1. */
@@ -45,6 +47,9 @@ function timestamp(): string {
 
 function renderLogEntry(result: RunResult): string {
   const lines: string[] = [`### ${timestamp()} — ${result.status}`];
+  if (result.prompt) {
+    lines.push('', `**Reply:** ${result.prompt}`);
+  }
   if (result.error) {
     lines.push('', `> [!warning] ${result.error}`);
   }

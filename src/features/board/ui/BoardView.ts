@@ -106,6 +106,7 @@ export class BoardView extends ItemView {
         renderCard(body, card, {
           onOpen: (target) => this.openNote(target),
           onRun: (target) => void this.runner.run(target.path),
+          onReply: (target, text) => void this.runner.continue(target.path, text),
           isRunning: (target) => this.runner.isRunning(target.path),
         });
       }

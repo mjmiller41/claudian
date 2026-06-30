@@ -59,11 +59,26 @@ export class CardRunner {
     return this.running.has(path);
   }
 
+  /** Run a claude card from its task prompt. */
   async run(path: string): Promise<void> {
+    return this.execute(path, null);
+  }
+
+  /** Continue a card's session with a follow-up reply instead of its task prompt. */
+  async continue(path: string, reply: string): Promise<void> {
+    const text = reply.trim();
+    if (!text) return;
+    return this.execute(path, text);
+  }
+
+  private async execute(path: string, overrideText: string | null): Promise<void> {
     if (this.running.has(path)) return;
 
     const card = await this.deps.store.loadRunnable(path);
     if (!card || card.kind !== 'claude') return; // human cards are manual
+
+    const turnText = (overrideText ?? card.prompt).trim();
+    if (!turnText) return;
 
     this.running.add(path);
     let runtime: ChatRuntime | null = null;
@@ -104,7 +119,7 @@ export class CardRunner {
       await this.deps.store.setStatus(path, 'running');
       this.deps.onUpdate?.();
 
-      const turn = runtime.prepareTurn({ text: card.prompt, currentNotePath: card.path });
+      const turn = runtime.prepareTurn({ text: turnText, currentNotePath: card.path });
 
       let assistantText = '';
       const toolNames: string[] = [];
@@ -142,6 +157,7 @@ export class CardRunner {
         session,
         providerState,
         error: errorText,
+        prompt: overrideText ?? undefined,
       });
     } catch (err) {
       await this.deps.store.applyRunResult(
