@@ -138,6 +138,17 @@
   border: 1px solid var(--color-accent);
 }
 
+.claudian-board-badge-needs-reply {
+  color: var(--text-on-accent);
+  background: var(--color-orange, var(--color-accent));
+}
+
+.claudian-board-badge-ready {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+}
+
 .claudian-board-card-actions {
   display: flex;
   gap: var(--size-2-2);
@@ -202,13 +213,48 @@
   font-size: var(--font-ui-smaller);
 }
 
-.claudian-board-approval-tool {
-  font-family: var(--font-monospace);
-  font-size: var(--font-ui-small);
+.claudian-board-approval-action {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
   color: var(--text-normal);
 }
 
-.claudian-board-approval-desc,
+.claudian-board-approval-command {
+  margin-top: var(--size-4-1);
+  padding: var(--size-2-2) var(--size-4-2);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  border-radius: var(--radius-s);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.claudian-board-approval-fields {
+  margin-top: var(--size-4-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+}
+
+.claudian-board-approval-field {
+  display: flex;
+  gap: var(--size-4-2);
+  font-size: var(--font-ui-small);
+}
+
+.claudian-board-approval-field-key {
+  flex: 0 0 30%;
+  color: var(--text-muted);
+}
+
+.claudian-board-approval-field-value {
+  flex: 1;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
 .claudian-board-question-text {
   margin-top: var(--size-4-1);
   color: var(--text-normal);

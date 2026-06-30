@@ -1,11 +1,11 @@
 import { type App, Modal, Setting } from 'obsidian';
 
 import type { ApprovalDecision } from '../../../core/types';
+import { describeToolCall } from './describeToolCall';
 
 export interface ApprovalRequest {
   cardTitle: string;
   toolName: string;
-  description: string;
   input: Record<string, unknown>;
 }
 
@@ -34,10 +34,19 @@ export class ApprovalModal extends Modal {
       text: this.request.cardTitle,
     });
 
-    const detail = contentEl.createDiv({ cls: 'claudian-board-approval-detail' });
-    detail.createEl('span', { cls: 'claudian-board-approval-tool', text: this.request.toolName });
-    if (this.request.description) {
-      detail.createEl('div', { cls: 'claudian-board-approval-desc', text: this.request.description });
+    const { title, detail, fields } = describeToolCall(this.request.toolName, this.request.input);
+    const body = contentEl.createDiv({ cls: 'claudian-board-approval-detail' });
+    body.createEl('div', { cls: 'claudian-board-approval-action', text: title });
+    if (detail) {
+      body.createEl('div', { cls: 'claudian-board-approval-command', text: detail });
+    }
+    if (fields.length > 0) {
+      const list = body.createDiv({ cls: 'claudian-board-approval-fields' });
+      for (const [key, value] of fields) {
+        const row = list.createDiv({ cls: 'claudian-board-approval-field' });
+        row.createEl('span', { cls: 'claudian-board-approval-field-key', text: key });
+        row.createEl('span', { cls: 'claudian-board-approval-field-value', text: value });
+      }
     }
 
     new Setting(contentEl)

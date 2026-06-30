@@ -27,6 +27,8 @@ export interface RunResult {
   error?: string;
   /** The follow-up message that drove this turn, recorded for continue turns. */
   prompt?: string;
+  /** Whether the turn appears to be waiting on the user. */
+  needsReply: boolean;
 }
 
 /** Extract the task/prompt body: text between the frontmatter and `## Log`, minus the H1. */
@@ -127,6 +129,7 @@ export class CardStore {
       providerState: null,
       parent: input.parent ?? null,
       children: [],
+      needsReply: false,
       order: 0,
     };
     const folder = input.board ? `${this.boardFolder}/${input.board}` : this.boardFolder;
@@ -152,6 +155,7 @@ export class CardStore {
       fm.status = result.status;
       fm.session = result.session;
       fm.provider_state = encodeProviderState(result.providerState);
+      fm.needs_reply = result.needsReply;
     });
     await this.app.vault.process(file, (data) => appendUnderLog(data, renderLogEntry(result)));
   }

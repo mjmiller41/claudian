@@ -43,6 +43,8 @@ export interface CardState {
   children: string[];
   /** Task/prompt body that drives a claude card. */
   prompt: string;
+  /** True when the last turn appears to be waiting on the user (vs. just done). */
+  needsReply: boolean;
   /** Column ordering hint. */
   order: number;
 }

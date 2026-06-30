@@ -27,6 +27,7 @@ export interface CardFrontmatter {
   state_schema_version: number;
   parent: string | null;
   children: string[];
+  needs_reply: boolean;
   order: number;
 }
 
@@ -83,6 +84,7 @@ export function buildCardFrontmatter(card: CardState): CardFrontmatter {
     state_schema_version: CARD_STATE_SCHEMA_VERSION,
     parent: card.parent,
     children: card.children,
+    needs_reply: card.needsReply,
     order: card.order,
   };
 }
@@ -114,6 +116,7 @@ export function readCardState(frontmatter: Record<string, unknown>, body: CardBo
     providerState: decodeProviderState(frontmatter.provider_state),
     parent: coerceString(frontmatter.parent),
     children: coerceStringArray(frontmatter.children),
+    needsReply: frontmatter.needs_reply === true,
     order: typeof frontmatter.order === 'number' ? frontmatter.order : 0,
   };
 }

@@ -45,6 +45,7 @@ describe('card frontmatter build → read round-trip', () => {
     providerState: { threadId: 't1' },
     parent: '[[Parent]]',
     children: ['[[Child A]]', '[[Child B]]'],
+    needsReply: true,
     order: 3,
   };
 

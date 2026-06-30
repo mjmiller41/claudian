@@ -31,8 +31,8 @@ export class BoardView extends ItemView {
     this.runner = new CardRunner({
       plugin,
       store: this.store,
-      requestApproval: (card, toolName, input, description) =>
-        new ApprovalModal(plugin.app, { cardTitle: card.title, toolName, description, input }).openAndWait(),
+      requestApproval: (card, toolName, input) =>
+        new ApprovalModal(plugin.app, { cardTitle: card.title, toolName, input }).openAndWait(),
       askQuestion: (input) => new QuestionModal(plugin.app, input).openAndWait(),
       onUpdate: () => this.scheduleRender(),
     });

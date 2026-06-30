@@ -44,6 +44,21 @@ export function renderCard(container: HTMLElement, card: CardState, cb: CardElCa
     });
   }
 
+  const running = cb.isRunning(card);
+  if (card.kind === 'claude' && !running && REPLIABLE.has(card.status)) {
+    if (card.needsReply) {
+      badges.createEl('span', {
+        cls: 'claudian-board-badge claudian-board-badge-needs-reply',
+        text: 'Reply needed',
+      });
+    } else if (card.status === 'review') {
+      badges.createEl('span', {
+        cls: 'claudian-board-badge claudian-board-badge-ready',
+        text: 'Ready',
+      });
+    }
+  }
+
   const actions = el.createDiv({ cls: 'claudian-board-card-actions' });
 
   const openBtn = actions.createEl('button', { cls: 'claudian-board-card-btn', attr: { 'aria-label': 'Open note' } });
@@ -51,10 +66,8 @@ export function renderCard(container: HTMLElement, card: CardState, cb: CardElCa
   openBtn.addEventListener('click', () => cb.onOpen(card));
 
   if (card.kind === 'claude') {
-    const running = cb.isRunning(card);
-
     if (REPLIABLE.has(card.status) && !running) {
-      renderReply(el, actions, card, cb);
+      renderReply(el, actions, card, cb, card.needsReply);
     }
 
     const runBtn = actions.createEl('button', {
@@ -73,8 +86,10 @@ function renderReply(
   actions: HTMLElement,
   state: CardState,
   cb: CardElCallbacks,
+  autoOpen: boolean,
 ): void {
-  const replyArea = card.createDiv({ cls: 'claudian-board-card-reply is-collapsed' });
+  const replyArea = card.createDiv({ cls: 'claudian-board-card-reply' });
+  replyArea.toggleClass('is-collapsed', !autoOpen);
   const input = replyArea.createEl('textarea', {
     cls: 'claudian-board-reply-input',
     attr: { placeholder: 'Reply to continue…', rows: '2' },
@@ -94,7 +109,7 @@ function renderReply(
     }
   });
 
-  let open = false;
+  let open = autoOpen;
   const toggleBtn = actions.createEl('button', {
     cls: 'claudian-board-card-btn',
     attr: { 'aria-label': 'Reply' },

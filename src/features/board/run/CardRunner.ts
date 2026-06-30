@@ -8,6 +8,7 @@ import { getVaultPath, isPathWithinVault } from '../../../utils/path';
 import type { CardState } from '../cards/CardState';
 import type { CardStore, RunResult } from '../cards/CardStore';
 import { decide } from './AutonomyGate';
+import { inferNeedsReply } from './inferNeedsReply';
 
 type ToolGateFn = (toolName: string, input: unknown) => 'allow' | 'ask' | 'deny';
 
@@ -150,14 +151,16 @@ export class CardRunner {
       const session = updates.sessionId ?? runtime.getSessionId() ?? card.session ?? null;
       const providerState = updates.providerState ?? card.providerState ?? null;
 
+      const trimmedText = assistantText.trim();
       await this.deps.store.applyRunResult(path, {
         status: errored ? 'failed' : 'review',
-        assistantText: assistantText.trim(),
+        assistantText: trimmedText,
         toolNames,
         session,
         providerState,
         error: errorText,
         prompt: overrideText ?? undefined,
+        needsReply: !errored && inferNeedsReply(trimmedText, toolNames),
       });
     } catch (err) {
       await this.deps.store.applyRunResult(
@@ -193,6 +196,7 @@ export class CardRunner {
       session: card.session,
       providerState: card.providerState,
       error,
+      needsReply: false,
     };
   }
 }
