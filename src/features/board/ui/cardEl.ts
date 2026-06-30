@@ -6,7 +6,9 @@ export interface CardElCallbacks {
   onOpen: (card: CardState) => void;
   onRun: (card: CardState) => void;
   onReply: (card: CardState, text: string) => void;
+  onDecompose: (card: CardState) => void;
   isRunning: (card: CardState) => boolean;
+  childProgress: (card: CardState) => { total: number; done: number } | null;
 }
 
 /** States where continuing the conversation makes sense. */
@@ -37,10 +39,11 @@ export function renderCard(container: HTMLElement, card: CardState, cb: CardElCa
   if (card.role === 'subagent') {
     badges.createEl('span', { cls: 'claudian-board-badge claudian-board-badge-subagent', text: 'Subagent' });
   }
-  if (card.children.length > 0) {
+  const progress = cb.childProgress(card);
+  if (progress) {
     badges.createEl('span', {
-      cls: 'claudian-board-badge',
-      text: `${card.children.length} child${card.children.length === 1 ? '' : 'ren'}`,
+      cls: 'claudian-board-badge claudian-board-badge-progress',
+      text: `${progress.done}/${progress.total} done`,
     });
   }
 
@@ -68,6 +71,15 @@ export function renderCard(container: HTMLElement, card: CardState, cb: CardElCa
   if (card.kind === 'claude') {
     if (REPLIABLE.has(card.status) && !running) {
       renderReply(el, actions, card, cb, card.needsReply);
+    }
+
+    if (card.role === 'task' && !running) {
+      const decomposeBtn = actions.createEl('button', {
+        cls: 'claudian-board-card-btn',
+        attr: { 'aria-label': 'Decompose into subtasks' },
+      });
+      setIcon(decomposeBtn, 'git-fork');
+      decomposeBtn.addEventListener('click', () => cb.onDecompose(card));
     }
 
     const runBtn = actions.createEl('button', {

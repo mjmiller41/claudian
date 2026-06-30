@@ -67,6 +67,14 @@ function renderLogEntry(result: RunResult): string {
   return lines.join('\n');
 }
 
+/** Extract the basename a `[[link|alias]]` points to, ignoring alias and folders. */
+export function wikilinkBasename(link: string | null): string | null {
+  if (!link) return null;
+  const match = link.match(/\[\[([^\]]+)\]\]/);
+  const target = (match ? match[1] : link).split('|')[0].trim();
+  return target.split('/').pop()?.trim() || null;
+}
+
 function appendUnderLog(data: string, entry: string): string {
   const trimmed = data.replace(/\s+$/, '');
   if (trimmed.includes(LOG_HEADING)) {
@@ -137,7 +145,22 @@ export class CardStore {
     const path = await this.uniquePath(folder, card.title);
     const file = await this.app.vault.create(path, renderNote(card));
     card.path = file.path;
+    card.title = file.basename; // may differ from input after dedupe; links resolve to the basename
     return card;
+  }
+
+  /** Subagent cards whose `parent` wikilink resolves to the given card title. */
+  listChildren(parentTitle: string): CardState[] {
+    return this.listCards().filter(
+      (card) => card.role === 'subagent' && wikilinkBasename(card.parent) === parentTitle,
+    );
+  }
+
+  childProgress(parentTitle: string): { total: number; done: number } | null {
+    const children = this.listChildren(parentTitle);
+    if (children.length === 0) return null;
+    const done = children.filter((c) => c.status === 'review' || c.status === 'done').length;
+    return { total: children.length, done };
   }
 
   async setStatus(path: string, status: CardStatus): Promise<void> {

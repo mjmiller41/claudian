@@ -4,6 +4,7 @@ import type ClaudianPlugin from '../../../main';
 import { CARD_STATUSES, type CardKind, type CardState } from '../cards/CardState';
 import { CardStore } from '../cards/CardStore';
 import { CardRunner } from '../run/CardRunner';
+import { Orchestrator } from '../run/Orchestrator';
 import { ApprovalModal } from './ApprovalModal';
 import { renderCard } from './cardEl';
 import { NewCardModal } from './NewCardModal';
@@ -23,6 +24,7 @@ const COLUMN_LABELS: Record<string, string> = {
 export class BoardView extends ItemView {
   private readonly store: CardStore;
   private readonly runner: CardRunner;
+  private readonly orchestrator: Orchestrator;
   private renderScheduled = false;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: ClaudianPlugin) {
@@ -34,6 +36,11 @@ export class BoardView extends ItemView {
       requestApproval: (card, toolName, input) =>
         new ApprovalModal(plugin.app, { cardTitle: card.title, toolName, input }).openAndWait(),
       askQuestion: (input) => new QuestionModal(plugin.app, input).openAndWait(),
+      onUpdate: () => this.scheduleRender(),
+    });
+    this.orchestrator = new Orchestrator({
+      store: this.store,
+      runner: this.runner,
       onUpdate: () => this.scheduleRender(),
     });
   }
@@ -107,7 +114,9 @@ export class BoardView extends ItemView {
           onOpen: (target) => this.openNote(target),
           onRun: (target) => void this.runner.run(target.path),
           onReply: (target, text) => void this.runner.continue(target.path, text),
+          onDecompose: (target) => void this.orchestrator.decompose(target.path),
           isRunning: (target) => this.runner.isRunning(target.path),
+          childProgress: (target) => this.store.childProgress(target.title),
         });
       }
     }

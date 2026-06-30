@@ -6,7 +6,7 @@ import type { PermissionMode } from '../../../core/types/settings';
 import type ClaudianPlugin from '../../../main';
 import { getVaultPath, isPathWithinVault } from '../../../utils/path';
 import type { CardState } from '../cards/CardState';
-import type { CardStore, RunResult } from '../cards/CardStore';
+import type { CardStore } from '../cards/CardStore';
 import { decide } from './AutonomyGate';
 import { inferNeedsReply } from './inferNeedsReply';
 
@@ -36,6 +36,15 @@ export type ApprovalResolver = (
 export type QuestionResolver = (
   input: Record<string, unknown>,
 ) => Promise<Record<string, string | string[]> | null>;
+
+interface TurnOutcome {
+  text: string;
+  toolNames: string[];
+  errored: boolean;
+  errorText?: string;
+  session: string | null;
+  providerState: Record<string, unknown> | null;
+}
 
 export interface CardRunnerDeps {
   plugin: ClaudianPlugin;
@@ -72,6 +81,28 @@ export class CardRunner {
     return this.execute(path, text);
   }
 
+  /**
+   * Run an ephemeral planning turn (fresh session, not persisted) and return the
+   * raw text. Used by the orchestrator to ask a card to decompose itself without
+   * polluting the card's task session.
+   */
+  async plan(path: string, instruction: string): Promise<string | null> {
+    if (this.running.has(path)) return null;
+    const card = await this.deps.store.loadRunnable(path);
+    if (!card || card.kind !== 'claude') return null;
+
+    this.running.add(path);
+    this.deps.onUpdate?.();
+    try {
+      const ephemeral: CardState = { ...card, session: null, providerState: null };
+      const outcome = await this.streamTurn(ephemeral, instruction);
+      return outcome.errored ? null : outcome.text;
+    } finally {
+      this.running.delete(path);
+      this.deps.onUpdate?.();
+    }
+  }
+
   private async execute(path: string, overrideText: string | null): Promise<void> {
     if (this.running.has(path)) return;
 
@@ -82,6 +113,33 @@ export class CardRunner {
     if (!turnText) return;
 
     this.running.add(path);
+    try {
+      await this.deps.store.setStatus(path, 'running');
+      this.deps.onUpdate?.();
+
+      const outcome = await this.streamTurn(card, turnText);
+      await this.deps.store.applyRunResult(path, {
+        status: outcome.errored ? 'failed' : 'review',
+        assistantText: outcome.text,
+        toolNames: outcome.toolNames,
+        session: outcome.session,
+        providerState: outcome.providerState,
+        error: outcome.errorText,
+        prompt: overrideText ?? undefined,
+        needsReply: !outcome.errored && inferNeedsReply(outcome.text, outcome.toolNames),
+      });
+    } finally {
+      this.running.delete(path);
+      this.deps.onUpdate?.();
+    }
+  }
+
+  /**
+   * Create a runtime, install the gate, stream one turn, and return the outcome.
+   * Owns no store or running-set state — callers persist the result. Fails closed
+   * (errored outcome) if the permission gate can't be enforced.
+   */
+  private async streamTurn(card: CardState, turnText: string): Promise<TurnOutcome> {
     let runtime: ChatRuntime | null = null;
     try {
       runtime = ProviderRegistry.createChatRuntime({
@@ -91,11 +149,7 @@ export class CardRunner {
 
       const gated = asGated(runtime);
       if (!gated) {
-        await this.deps.store.applyRunResult(
-          path,
-          this.failure(card, 'Permission gate unavailable for this provider; refusing to run ungated.'),
-        );
-        return;
+        return this.errorOutcome(card, 'Permission gate unavailable for this provider; refusing to run ungated.');
       }
       gated.setPermissionModeOverride('normal');
 
@@ -116,9 +170,6 @@ export class CardRunner {
         return this.deps.requestApproval(card, toolName, input, description);
       });
       runtime.setAskUserQuestionCallback((input) => this.deps.askQuestion(input));
-
-      await this.deps.store.setStatus(path, 'running');
-      this.deps.onUpdate?.();
 
       const turn = runtime.prepareTurn({ text: turnText, currentNotePath: card.path });
 
@@ -148,30 +199,30 @@ export class CardRunner {
         conversation,
         sessionInvalidated: runtime.consumeSessionInvalidation(),
       });
-      const session = updates.sessionId ?? runtime.getSessionId() ?? card.session ?? null;
-      const providerState = updates.providerState ?? card.providerState ?? null;
-
-      const trimmedText = assistantText.trim();
-      await this.deps.store.applyRunResult(path, {
-        status: errored ? 'failed' : 'review',
-        assistantText: trimmedText,
+      return {
+        text: assistantText.trim(),
         toolNames,
-        session,
-        providerState,
-        error: errorText,
-        prompt: overrideText ?? undefined,
-        needsReply: !errored && inferNeedsReply(trimmedText, toolNames),
-      });
+        errored,
+        errorText,
+        session: updates.sessionId ?? runtime.getSessionId() ?? card.session ?? null,
+        providerState: updates.providerState ?? card.providerState ?? null,
+      };
     } catch (err) {
-      await this.deps.store.applyRunResult(
-        path,
-        this.failure(card, err instanceof Error ? err.message : String(err)),
-      );
+      return this.errorOutcome(card, err instanceof Error ? err.message : String(err));
     } finally {
       runtime?.cleanup();
-      this.running.delete(path);
-      this.deps.onUpdate?.();
     }
+  }
+
+  private errorOutcome(card: CardState, errorText: string): TurnOutcome {
+    return {
+      text: '',
+      toolNames: [],
+      errored: true,
+      errorText,
+      session: card.session,
+      providerState: card.providerState,
+    };
   }
 
   private buildConversation(card: CardState): Conversation {
@@ -185,18 +236,6 @@ export class CardRunner {
       sessionId: card.session,
       providerState: card.providerState ?? undefined,
       messages: [],
-    };
-  }
-
-  private failure(card: CardState, error: string): RunResult {
-    return {
-      status: 'failed',
-      assistantText: '',
-      toolNames: [],
-      session: card.session,
-      providerState: card.providerState,
-      error,
-      needsReply: false,
     };
   }
 }

@@ -149,6 +149,12 @@
   border: 1px solid var(--background-modifier-border);
 }
 
+.claudian-board-badge-progress {
+  color: var(--color-accent);
+  background: transparent;
+  border: 1px solid var(--color-accent);
+}
+
 .claudian-board-card-actions {
   display: flex;
   gap: var(--size-2-2);
